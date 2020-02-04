@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -11,12 +11,6 @@ import (
 type Page struct {
 	Title string
 	Body  []byte
-}
-
-func viewHandler(w http.ResponseWriter, r *http.Request) {
-	title := r.URL.Path[len("/view/"):]
-	p, _ := loadPage(title)
-	fmt.Fprintf(w, "<h1>%s</h1><div>%s</div>", p.Title, p.Body)
 }
 
 func (p *Page) save() error {
@@ -33,11 +27,39 @@ func loadPage(title string) (*Page, error) {
 	return &Page{Title: title, Body: body}, nil
 }
 
+func editHandler(w http.ResponseWriter, r *http.Request) {
+	title := r.URL.Path[len("/view/"):]
+	p, err := loadPage(title)
+	if err != nil {
+		p = &Page{Title: title}
+	}
+	renderTemplate(w, "edit", p)
+}
+
+// func saveHandler(w http.ResponseWriter, r *http.Request) {
+// 	title := r.URL.Path[len("/view/"):]
+// 	p, _ := loadPage(title)
+// 	fmt.Fprintf(w, "<h1>%s</h1><div>%s</div>", p.Title, p.Body)
+// }
+
+func viewHandler(w http.ResponseWriter, r *http.Request) {
+	title := r.URL.Path[len("/view/"):]
+	p, err := loadPage(title)
+	if err != nil {
+		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
+		return
+	}
+	renderTemplate(w, "view", p)
+}
+
+func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
+	t, _ := template.ParseFiles(tmpl + ".html")
+	t.Execute(w, p)
+}
+
 func main() {
+	http.HandleFunc("/edit/", editHandler)
+	// http.HandleFunc("/save/", saveHandler)
 	http.HandleFunc("/view/", viewHandler)
-	log.Fatal(http.ListenAndServe(":8000", nil))
-	// p1 := &Page{Title: "TestPage", Body: []byte("This is a sample Page.")}
-	// p1.save()
-	// p2, _ := loadPage("TestPage")
-	// fmt.Println(string(p2.Body))
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
